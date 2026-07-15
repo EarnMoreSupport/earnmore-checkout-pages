@@ -44,9 +44,21 @@
   <script>
     // The extension's background script reads the access_token directly out of this page's URL
     // (via a tabs.onUpdated listener matching this exact URL, watching for the #access_token=
-    // fragment) — nothing on this page hands anything off manually. This page only exists to
-    // give the magic-link email a valid https:// destination to redirect to, and to show the
-    // user something other than a blank tab while that happens.
+    // fragment) — nothing on this page hands anything off manually for that flow. This page only
+    // exists to give the magic-link email a valid https:// destination to redirect to, and to
+    // show the user something other than a blank tab while that happens.
+    //
+    // Native iOS/macOS has no extension background script watching tab URLs, so it needs an
+    // actual handoff: if EarnMore is installed, this attempts a client-side redirect to
+    // earnmore://authcallback with the same fragment. Supabase's own server-side redirect_to
+    // has a known reliability issue for magic links when the target is a non-http(s) custom
+    // scheme (falls back to the Site URL instead) — routing through this https:// page first,
+    // then doing the scheme redirect client-side, sidesteps that entirely. On desktop browsers
+    // with no app registered for earnmore://, this just silently no-ops and the extension flow
+    // above proceeds exactly as before.
+    if (window.location.hash.includes('access_token')) {
+      window.location.href = 'earnmore://authcallback' + window.location.hash;
+    }
     setTimeout(function() {
       document.getElementById('heading').textContent = 'All set';
       document.getElementById('message').textContent = 'You can close this tab now.';
