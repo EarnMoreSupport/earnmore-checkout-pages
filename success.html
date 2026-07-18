@@ -3,12 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>You're all set — EarnMore</title>
+<title>Welcome to EarnMore Plus</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  @media (prefers-reduced-motion: no-preference) {
+    .card { animation: rise 0.5s ease-out; }
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
     background: #1a1a2e;
+    background-image: radial-gradient(circle at 50% -10%, rgba(0, 212, 170, 0.16), transparent 55%);
     color: #fff;
     min-height: 100vh;
     display: flex;
@@ -17,10 +22,16 @@
     padding: 24px;
   }
   .card {
-    max-width: 420px;
+    max-width: 400px;
     width: 100%;
     text-align: center;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 40px 32px 32px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   }
+  .logo { height: 64px; margin-bottom: 24px; }
   .badge {
     width: 56px;
     height: 56px;
@@ -31,44 +42,68 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 28px;
-    color: #00d4aa;
   }
   h1 {
-    font-size: 22px;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
     margin-bottom: 10px;
   }
-  p {
-    font-size: 15px;
-    line-height: 1.5;
-    color: rgba(255, 255, 255, 0.7);
-    margin-bottom: 28px;
+  p.intro {
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.65);
   }
+  .features {
+    list-style: none;
+    text-align: left;
+    margin: 22px 0 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+  .features li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.82);
+  }
+  .features svg { flex-shrink: 0; }
   button {
     background: rgba(0, 212, 170, 0.15);
     border: 1px solid rgba(0, 212, 170, 0.4);
     color: #00d4aa;
     font-size: 14px;
-    font-weight: bold;
-    padding: 10px 24px;
-    border-radius: 8px;
+    font-weight: 600;
+    padding: 11px 28px;
+    border-radius: 10px;
     cursor: pointer;
+    transition: background 0.15s ease;
   }
-  button:hover {
-    background: rgba(0, 212, 170, 0.25);
-  }
+  button:hover { background: rgba(0, 212, 170, 0.25); }
+  button:active { transform: scale(0.98); }
   .hint {
-    margin-top: 16px;
+    margin-top: 18px;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.35);
   }
 </style>
 </head>
 <body>
   <div class="card">
-    <div class="badge">✓</div>
-    <h1>You're all set</h1>
-    <p>Premium is now active on your account. Cross-device sync, bonus-offer tracking, spend-cap accuracy, and your full rewards history are ready — just log back into EarnMore on any device to see them.</p>
+    <img class="logo" alt="EarnMore" src="data:image/png;base64,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">
+    <div class="badge">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    </div>
+    <h1>Welcome to EarnMore Plus</h1>
+    <p class="intro">Your subscription is active. Here's what's unlocked — just log back into EarnMore on any device to see it:</p>
+    <ul class="features">
+      <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Bonus-offer tracking</li>
+      <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Spend-cap tracking</li>
+      <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Full rewards history</li>
+      <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Full transaction history</li>
+    </ul>
     <button onclick="window.close()">Close this tab</button>
     <p class="hint">If this tab doesn't close automatically, it's safe to close manually.</p>
   </div>
