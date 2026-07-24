@@ -116,6 +116,48 @@
     if (window.location.hash.includes('access_token')) {
       window.location.href = 'earnmore://authcallback' + window.location.hash;
     }
+
+    // Cross-device handoff: neither of the two mechanisms above helps if this link is opened on a
+    // device/browser that has neither the extension nor the app installed — the token is real and
+    // sitting right here in the URL, but nothing captures it. If the requesting client generated a
+    // pickup nonce (folded into the magic link's redirect URL as ?p=..., which Supabase preserves
+    // through the redirect alongside its own #access_token fragment), POST the session to the
+    // magic-link-pickup Edge Function keyed by that nonce, regardless of what's installed here —
+    // the requesting client is polling for it by the same nonce. A page loaded from an older email
+    // (sent before this existed) simply has no ?p= param and skips this harmlessly.
+    (function() {
+      var hash = window.location.hash.replace(/^#/, '');
+      var hashParams = {};
+      hash.split('&').forEach(function(pair) {
+        var idx = pair.indexOf('=');
+        if (idx === -1) return;
+        hashParams[pair.slice(0, idx)] = decodeURIComponent(pair.slice(idx + 1));
+      });
+      var nonce = new URLSearchParams(window.location.search).get('p');
+      var accessToken = hashParams['access_token'];
+      var refreshToken = hashParams['refresh_token'];
+      var expiresIn = hashParams['expires_in'];
+      if (!nonce || !accessToken || !refreshToken || !expiresIn) return;
+      fetch('https://ongagzsmpexzfnmhggvs.supabase.co/functions/v1/magic-link-pickup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uZ2FnenNtcGV4emZubWhnZ3ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwODk5MDQsImV4cCI6MjA5MDY2NTkwNH0.0LcoGf_00CgfKLZlqIaWmb0Riy27pGtv4cf29ANzCeo'
+        },
+        body: JSON.stringify({
+          action: 'store',
+          nonce: nonce,
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          expires_in: parseInt(expiresIn, 10)
+        })
+      }).catch(function() {
+        // Best-effort — the extension's tab-watching or the earnmore:// redirect above may have
+        // already completed sign-in on this same device, and native's own Keychain-sync poll is a
+        // fallback for the Apple-to-Apple case regardless, so a failed store here (offline, ad
+        // blocker, function not yet deployed) isn't the only path to a working sign-in.
+      });
+    })();
     setTimeout(function() {
       document.getElementById('spinner').style.display = 'none';
       document.getElementById('badge').style.display = 'flex';
