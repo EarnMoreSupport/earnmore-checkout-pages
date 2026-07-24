@@ -119,13 +119,28 @@
 
     // Cross-device handoff: neither of the two mechanisms above helps if this link is opened on a
     // device/browser that has neither the extension nor the app installed — the token is real and
-    // sitting right here in the URL, but nothing captures it. If the requesting client generated a
-    // pickup nonce (folded into the magic link's redirect URL as ?p=..., which Supabase preserves
-    // through the redirect alongside its own #access_token fragment), POST the session to the
-    // magic-link-pickup Edge Function keyed by that nonce, regardless of what's installed here —
-    // the requesting client is polling for it by the same nonce. A page loaded from an older email
-    // (sent before this existed) simply has no ?p= param and skips this harmlessly.
+    // sitting right here in the URL, but nothing captures it. Correlated by EMAIL, not a URL
+    // param — an earlier version tried folding a pickup nonce into the redirect URL as ?p=...,
+    // assuming Supabase would preserve it alongside its own #access_token fragment on redirect.
+    // Confirmed via real testing that assumption is wrong — the query string never survives, only
+    // the fragment does. So instead: the requesting device registers {email, nonce} directly with
+    // magic-link-pickup BEFORE the magic link is even sent, and this page just decodes the email
+    // straight out of the access_token JWT (no server round-trip needed for that part) and POSTs
+    // the session keyed by it — the requesting device polls for it by the same email + its own
+    // nonce, which this page never sees or needs to know.
     (function() {
+      function decodeJwtPayload(token) {
+        try {
+          var base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+          var padded = base64 + '==='.slice((base64.length + 3) % 4);
+          var json = decodeURIComponent(atob(padded).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+          return JSON.parse(json);
+        } catch (e) {
+          return null;
+        }
+      }
       var hash = window.location.hash.replace(/^#/, '');
       var hashParams = {};
       hash.split('&').forEach(function(pair) {
@@ -133,11 +148,13 @@
         if (idx === -1) return;
         hashParams[pair.slice(0, idx)] = decodeURIComponent(pair.slice(idx + 1));
       });
-      var nonce = new URLSearchParams(window.location.search).get('p');
       var accessToken = hashParams['access_token'];
       var refreshToken = hashParams['refresh_token'];
       var expiresIn = hashParams['expires_in'];
-      if (!nonce || !accessToken || !refreshToken || !expiresIn) return;
+      if (!accessToken || !refreshToken || !expiresIn) return;
+      var payload = decodeJwtPayload(accessToken);
+      var email = payload && payload.email;
+      if (!email) return;
       fetch('https://ongagzsmpexzfnmhggvs.supabase.co/functions/v1/magic-link-pickup', {
         method: 'POST',
         headers: {
@@ -145,8 +162,8 @@
           'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uZ2FnenNtcGV4emZubWhnZ3ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwODk5MDQsImV4cCI6MjA5MDY2NTkwNH0.0LcoGf_00CgfKLZlqIaWmb0Riy27pGtv4cf29ANzCeo'
         },
         body: JSON.stringify({
-          action: 'store',
-          nonce: nonce,
+          action: 'complete',
+          email: email,
           access_token: accessToken,
           refresh_token: refreshToken,
           expires_in: parseInt(expiresIn, 10)
@@ -154,7 +171,7 @@
       }).catch(function() {
         // Best-effort — the extension's tab-watching or the earnmore:// redirect above may have
         // already completed sign-in on this same device, and native's own Keychain-sync poll is a
-        // fallback for the Apple-to-Apple case regardless, so a failed store here (offline, ad
+        // fallback for the Apple-to-Apple case regardless, so a failed complete here (offline, ad
         // blocker, function not yet deployed) isn't the only path to a working sign-in.
       });
     })();
