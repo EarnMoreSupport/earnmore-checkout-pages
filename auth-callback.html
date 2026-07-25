@@ -131,13 +131,27 @@
     if (!tokenHash) {
       showError('This link is missing what it needs to sign you in. Request a new one from the app.');
     } else {
-      fetch(SUPABASE_URL + '/auth/v1/verify', {
+      // A SINGLE request to magic-link-pickup's verify_and_complete action — deliberately not a
+      // separate "verify, then hand off the result" two-step client-side sequence. An earlier
+      // version did exactly that (verify here, then a second fetch to deliver the session), and
+      // real testing found browsers/mail clients that tear the tab down partway through (Gmail's
+      // own link-open handling on desktop Chrome, confirmed) — the verify call would already reach
+      // Supabase and burn the one-time token, but the second step never ran because this page's JS
+      // died first, so the link became "used" with nothing ever actually signed in anywhere. Now
+      // the Edge Function itself does both the real Supabase verify AND the pending-row handoff in
+      // one atomic server-side step, so killing this tab right after the request is sent can no
+      // longer separate "token consumed" from "session actually delivered." keepalive: true asks
+      // the browser to still deliver the request even if this document is torn down immediately
+      // after — the response (fragment synthesis, success UI below) is a bonus if the tab survives
+      // long enough to see it, not a requirement for the sign-in to actually complete.
+      fetch(SUPABASE_URL + '/functions/v1/magic-link-pickup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'apikey': SUPABASE_ANON_KEY
         },
-        body: JSON.stringify({ type: 'magiclink', token_hash: tokenHash })
+        body: JSON.stringify({ action: 'verify_and_complete', token_hash: tokenHash }),
+        keepalive: true
       }).then(function(resp) {
         return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
       }).then(function(result) {
@@ -145,8 +159,7 @@
         var accessToken = data && data.access_token;
         var refreshToken = data && data.refresh_token;
         var expiresIn = data && data.expires_in;
-        var email = data && data.user && data.user.email;
-        if (!result.ok || !accessToken || !refreshToken || !expiresIn || !email) {
+        if (!result.ok || !data.ok || !accessToken || !refreshToken || !expiresIn) {
           showError('This link has expired or already been used. Request a new one from the app.');
           return;
         }
@@ -155,36 +168,14 @@
         // Supabase's own GET-redirect flow used to produce, purely so the Chrome/Firefox/Edge
         // extension's existing tabs.onUpdated listener (which watches for this exact fragment
         // shape on this exact URL) keeps working completely unmodified — it can't tell the
-        // difference between this and the old redirect-produced URL.
+        // difference between this and the old redirect-produced URL. Only relevant if this tab
+        // survives to see this response at all; the actual sign-in already happened server-side
+        // regardless, and the requesting device's poll will pick it up either way.
         var hash = 'access_token=' + encodeURIComponent(accessToken) +
           '&refresh_token=' + encodeURIComponent(refreshToken) +
           '&expires_in=' + encodeURIComponent(expiresIn) +
           '&token_type=bearer&type=magiclink';
         history.replaceState(null, '', window.location.pathname + window.location.search + '#' + hash);
-
-        // Cross-device handoff — POSTs the completed session to magic-link-pickup keyed by
-        // email, regardless of what device/browser this page is running on or what's installed
-        // there. The requesting device registered {email, nonce} before the link was even sent
-        // and polls for this by the same email + its own nonce, which this page never needs to
-        // know — see SubscriptionManager.swift's registerPendingPickup/pollPickupEndpoint.
-        fetch(SUPABASE_URL + '/functions/v1/magic-link-pickup', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY
-          },
-          body: JSON.stringify({
-            action: 'complete',
-            email: email,
-            access_token: accessToken,
-            refresh_token: refreshToken,
-            expires_in: expiresIn
-          })
-        }).catch(function() {
-          // Best-effort — the extension's tab-watching above may have already completed sign-in
-          // on this same device via the synthesized fragment, so a failed complete here (offline,
-          // ad blocker, function not yet deployed) isn't the only path to a working sign-in.
-        });
 
         showSuccess();
       }).catch(function() {
