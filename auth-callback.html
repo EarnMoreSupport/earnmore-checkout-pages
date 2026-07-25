@@ -105,21 +105,16 @@
     // exists to give the magic-link email a valid https:// destination to redirect to, and to
     // show the user something other than a blank tab while that happens.
     //
-    // Native iOS/macOS has no extension background script watching tab URLs, so it needs an
-    // actual handoff: if EarnMore is installed, this attempts a client-side redirect to
-    // earnmore://authcallback with the same fragment. Supabase's own server-side redirect_to
-    // has a known reliability issue for magic links when the target is a non-http(s) custom
-    // scheme (falls back to the Site URL instead) — routing through this https:// page first,
-    // then doing the scheme redirect client-side, sidesteps that entirely. On desktop browsers
-    // with no app registered for earnmore://, this just silently no-ops and the extension flow
-    // above proceeds exactly as before.
-    if (window.location.hash.includes('access_token')) {
-      window.location.href = 'earnmore://authcallback' + window.location.hash;
-    }
-
-    // Cross-device handoff: neither of the two mechanisms above helps if this link is opened on a
-    // device/browser that has neither the extension nor the app installed — the token is real and
-    // sitting right here in the URL, but nothing captures it. Correlated by EMAIL, not a URL
+    // Native iOS/macOS picks up the session entirely through the cross-device pickup below —
+    // there's no separate earnmore://authcallback client-side redirect handoff anymore (removed:
+    // the poll-based pickup already covers same-device sign-in too, just a few seconds slower than
+    // an instant deep-link handoff would have been, and dropping the redirect sidesteps desktop
+    // browsers/security software treating an unregistered custom-scheme navigation attempt oddly).
+    //
+    // Cross-device handoff: the extension's tab-watching above only helps if this link is opened
+    // in the same browser the extension is installed in — nothing helps if it's opened elsewhere
+    // (a different browser, no extension/app installed at all), the token is real and sitting
+    // right here in the URL, but nothing captures it. Correlated by EMAIL, not a URL
     // param — an earlier version tried folding a pickup nonce into the redirect URL as ?p=...,
     // assuming Supabase would preserve it alongside its own #access_token fragment on redirect.
     // Confirmed via real testing that assumption is wrong — the query string never survives, only
