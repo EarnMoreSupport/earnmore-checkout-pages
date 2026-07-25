@@ -94,90 +94,103 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
     </div>
     <h1 id="heading">Signing you in…</h1>
-    <p id="message">This tab will close automatically once your device picks up the sign-in. If it doesn't close within a few seconds, it's safe to close it yourself.</p>
+    <p id="message">Just a moment while we verify your link.</p>
     <button id="closeBtn" onclick="window.close()">Close this tab</button>
     <p class="hint" id="hint" style="display: none;">If this tab doesn't close automatically, it's safe to close manually.</p>
   </div>
   <script>
-    // The extension's background script reads the access_token directly out of this page's URL
-    // (via a tabs.onUpdated listener matching this exact URL, watching for the #access_token=
-    // fragment) — nothing on this page hands anything off manually for that flow. This page only
-    // exists to give the magic-link email a valid https:// destination to redirect to, and to
-    // show the user something other than a blank tab while that happens.
-    //
-    // Native iOS/macOS picks up the session entirely through the cross-device pickup below —
-    // there's no separate earnmore://authcallback client-side redirect handoff anymore (removed:
-    // the poll-based pickup already covers same-device sign-in too, just a few seconds slower than
-    // an instant deep-link handoff would have been, and dropping the redirect sidesteps desktop
-    // browsers/security software treating an unregistered custom-scheme navigation attempt oddly).
-    //
-    // Cross-device handoff: the extension's tab-watching above only helps if this link is opened
-    // in the same browser the extension is installed in — nothing helps if it's opened elsewhere
-    // (a different browser, no extension/app installed at all), the token is real and sitting
-    // right here in the URL, but nothing captures it. Correlated by EMAIL, not a URL
-    // param — an earlier version tried folding a pickup nonce into the redirect URL as ?p=...,
-    // assuming Supabase would preserve it alongside its own #access_token fragment on redirect.
-    // Confirmed via real testing that assumption is wrong — the query string never survives, only
-    // the fragment does. So instead: the requesting device registers {email, nonce} directly with
-    // magic-link-pickup BEFORE the magic link is even sent, and this page just decodes the email
-    // straight out of the access_token JWT (no server round-trip needed for that part) and POSTs
-    // the session keyed by it — the requesting device polls for it by the same email + its own
-    // nonce, which this page never sees or needs to know.
-    (function() {
-      function decodeJwtPayload(token) {
-        try {
-          var base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-          var padded = base64 + '==='.slice((base64.length + 3) % 4);
-          var json = decodeURIComponent(atob(padded).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-          }).join(''));
-          return JSON.parse(json);
-        } catch (e) {
-          return null;
-        }
-      }
-      var hash = window.location.hash.replace(/^#/, '');
-      var hashParams = {};
-      hash.split('&').forEach(function(pair) {
-        var idx = pair.indexOf('=');
-        if (idx === -1) return;
-        hashParams[pair.slice(0, idx)] = decodeURIComponent(pair.slice(idx + 1));
-      });
-      var accessToken = hashParams['access_token'];
-      var refreshToken = hashParams['refresh_token'];
-      var expiresIn = hashParams['expires_in'];
-      if (!accessToken || !refreshToken || !expiresIn) return;
-      var payload = decodeJwtPayload(accessToken);
-      var email = payload && payload.email;
-      if (!email) return;
-      fetch('https://ongagzsmpexzfnmhggvs.supabase.co/functions/v1/magic-link-pickup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uZ2FnenNtcGV4emZubWhnZ3ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwODk5MDQsImV4cCI6MjA5MDY2NTkwNH0.0LcoGf_00CgfKLZlqIaWmb0Riy27pGtv4cf29ANzCeo'
-        },
-        body: JSON.stringify({
-          action: 'complete',
-          email: email,
-          access_token: accessToken,
-          refresh_token: refreshToken,
-          expires_in: parseInt(expiresIn, 10)
-        })
-      }).catch(function() {
-        // Best-effort — the extension's tab-watching or the earnmore:// redirect above may have
-        // already completed sign-in on this same device, and native's own Keychain-sync poll is a
-        // fallback for the Apple-to-Apple case regardless, so a failed complete here (offline, ad
-        // blocker, function not yet deployed) isn't the only path to a working sign-in.
-      });
-    })();
-    setTimeout(function() {
+    // This page's own link is deliberately NOT Supabase's default magic-link URL (which is a bare
+    // GET to /auth/v1/verify that fully completes sign-in on any HTTP fetch — trivially consumed
+    // by email link-scanners/safe-link crawlers/antivirus URL checks before a real user ever
+    // clicks, since none of those run a JS engine, they just fetch the URL to check it). Instead,
+    // the Magic Link email template links here with a bare token_hash query param, and the actual
+    // verification below happens via a JS-initiated fetch() POST — something a plain URL-fetching
+    // scanner never triggers, since it never executes this script, only a real browser rendering
+    // this page does. Same end-user experience as a one-click magic link (no button, no extra
+    // step), immune to the class of scanner that broke the previous GET-based redirect flow.
+    var SUPABASE_URL = 'https://ongagzsmpexzfnmhggvs.supabase.co';
+    var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uZ2FnenNtcGV4emZubWhnZ3ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwODk5MDQsImV4cCI6MjA5MDY2NTkwNH0.0LcoGf_00CgfKLZlqIaWmb0Riy27pGtv4cf29ANzCeo';
+
+    function showError(message) {
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('heading').textContent = 'Link expired';
+      document.getElementById('message').textContent = message;
+      document.getElementById('closeBtn').style.display = 'inline-block';
+    }
+
+    function showSuccess() {
       document.getElementById('spinner').style.display = 'none';
       document.getElementById('badge').style.display = 'flex';
       document.getElementById('heading').textContent = "You're in";
-      document.getElementById('message').textContent = "You're signed in on this device. Head back to the extension or app to keep tracking your rewards.";
+      document.getElementById('message').textContent = "You're signed in. Head back to the extension or app to keep tracking your rewards.";
       document.getElementById('closeBtn').style.display = 'inline-block';
       document.getElementById('hint').style.display = 'block';
-    }, 4000);
+    }
+
+    var tokenHash = new URLSearchParams(window.location.search).get('token_hash');
+    if (!tokenHash) {
+      showError('This link is missing what it needs to sign you in. Request a new one from the app.');
+    } else {
+      fetch(SUPABASE_URL + '/auth/v1/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ type: 'magiclink', token_hash: tokenHash })
+      }).then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+      }).then(function(result) {
+        var data = result.data;
+        var accessToken = data && data.access_token;
+        var refreshToken = data && data.refresh_token;
+        var expiresIn = data && data.expires_in;
+        var email = data && data.user && data.user.email;
+        if (!result.ok || !accessToken || !refreshToken || !expiresIn || !email) {
+          showError('This link has expired or already been used. Request a new one from the app.');
+          return;
+        }
+
+        // Synthesizes the same #access_token=...&refresh_token=...&expires_in=... fragment
+        // Supabase's own GET-redirect flow used to produce, purely so the Chrome/Firefox/Edge
+        // extension's existing tabs.onUpdated listener (which watches for this exact fragment
+        // shape on this exact URL) keeps working completely unmodified — it can't tell the
+        // difference between this and the old redirect-produced URL.
+        var hash = 'access_token=' + encodeURIComponent(accessToken) +
+          '&refresh_token=' + encodeURIComponent(refreshToken) +
+          '&expires_in=' + encodeURIComponent(expiresIn) +
+          '&token_type=bearer&type=magiclink';
+        history.replaceState(null, '', window.location.pathname + window.location.search + '#' + hash);
+
+        // Cross-device handoff — POSTs the completed session to magic-link-pickup keyed by
+        // email, regardless of what device/browser this page is running on or what's installed
+        // there. The requesting device registered {email, nonce} before the link was even sent
+        // and polls for this by the same email + its own nonce, which this page never needs to
+        // know — see SubscriptionManager.swift's registerPendingPickup/pollPickupEndpoint.
+        fetch(SUPABASE_URL + '/functions/v1/magic-link-pickup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY
+          },
+          body: JSON.stringify({
+            action: 'complete',
+            email: email,
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            expires_in: expiresIn
+          })
+        }).catch(function() {
+          // Best-effort — the extension's tab-watching above may have already completed sign-in
+          // on this same device via the synthesized fragment, so a failed complete here (offline,
+          // ad blocker, function not yet deployed) isn't the only path to a working sign-in.
+        });
+
+        showSuccess();
+      }).catch(function() {
+        showError("Couldn't reach the sign-in server. Check your connection and request a new link from the app.");
+      });
+    }
   </script>
 </body>
 </html>
