@@ -22,7 +22,7 @@
     padding: 24px;
   }
   .card {
-    max-width: 400px;
+    max-width: 430px;
     width: 100%;
     text-align: center;
     background: rgba(255, 255, 255, 0.035);
@@ -54,13 +54,19 @@
     line-height: 1.6;
     color: rgba(255, 255, 255, 0.65);
   }
+  .features-columns {
+    display: flex;
+    gap: 20px;
+    margin: 22px 0 30px;
+  }
   .features {
     list-style: none;
     text-align: left;
-    margin: 22px 0 30px;
     display: flex;
     flex-direction: column;
     gap: 11px;
+    flex: 1;
+    min-width: 0;
   }
   .features li {
     display: flex;
@@ -97,13 +103,23 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
     </div>
     <h1>Welcome to EarnMore Plus</h1>
-    <p class="intro">Your subscription is active. Here's what's unlocked — just log back into EarnMore on any device to see it:</p>
-    <ul class="features">
-      <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Bonus-offer tracking</li>
-      <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Spend-cap tracking</li>
-      <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Full rewards history</li>
-      <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Full transaction history</li>
-    </ul>
+    <p class="intro">Your subscription is active. Here's what's unlocked — open EarnMore on any device you're signed into to start using them:</p>
+    <div class="features-columns">
+      <ul class="features">
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Best Card Recommendation</li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Category Choice</li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Activation Reminders</li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Analytics</li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Best Card Radar</li>
+      </ul>
+      <ul class="features">
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Full Transaction History</li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Full Rewards History</li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Bonus Offer Tracking</li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Spend Cap Tracking</li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Power User</li>
+      </ul>
+    </div>
     <button onclick="window.close()">Close this tab</button>
     <p class="hint">If this tab doesn't close automatically, it's safe to close manually.</p>
   </div>
